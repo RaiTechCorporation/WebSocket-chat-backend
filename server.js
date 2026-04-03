@@ -35,9 +35,12 @@ app.use("/uploads", uploadRoutes);
 // Socket
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "https://chat.onnbit.com"
+    ],
     credentials: true,
-    exposedHeaders: ["Content-Disposition"] // Ye line important hai download ke liye
+    exposedHeaders: ["Content-Disposition"]
   },
 });
 
@@ -48,7 +51,7 @@ app.get("/", (req, res) => {
     message: "API is running successfully! 🚀",
     docs: `http://${myIP}:9000/api-docs`
   });
-  });
+});
 app.set("io", io);
 // users global rakho
 global.users = {};

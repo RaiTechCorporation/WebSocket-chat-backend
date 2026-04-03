@@ -266,31 +266,31 @@ const socketHandler = (io) => {
     });
 
 
-// socket.on("upload_status", async ({ userId, stories }) => {
-//   try {
-//     const updatedStatus = await Status.findOneAndUpdate(
-//       { userId },
-//       {
-//         $push: { stories: { $each: stories } },
-//         $set: { createdAt: new Date() }
-//       },
-//       { upsert: true, new: true }
-//     ).populate("userId", "name profileImg");
+    // socket.on("upload_status", async ({ userId, stories }) => {
+    //   try {
+    //     const updatedStatus = await Status.findOneAndUpdate(
+    //       { userId },
+    //       {
+    //         $push: { stories: { $each: stories } },
+    //         $set: { createdAt: new Date() }
+    //       },
+    //       { upsert: true, new: true }
+    //     ).populate("userId", "name profileImg");
 
-//     // 👇 contacts ko bhejo
-//     const user = await User.findById(userId).populate("contacts");
+    //     // 👇 contacts ko bhejo
+    //     const user = await User.findById(userId).populate("contacts");
 
-//     user.contacts.forEach(contact => {
-//       const contactSocket = users[contact._id.toString()];
-//       if (contactSocket) {
-//         io.to(contactSocket).emit("status_update_received", updatedStatus);
-//       }
-//     });
+    //     user.contacts.forEach(contact => {
+    //       const contactSocket = users[contact._id.toString()];
+    //       if (contactSocket) {
+    //         io.to(contactSocket).emit("status_update_received", updatedStatus);
+    //       }
+    //     });
 
-//   } catch (err) {
-//     console.error(err);
-//   }
-// });
+    //   } catch (err) {
+    //     console.error(err);
+    //   }
+    // });
     socket.on("disconnect", async () => {
       let userId;
 
