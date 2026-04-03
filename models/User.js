@@ -24,31 +24,31 @@ const userSchema = new mongoose.Schema({
 
   // --- Naya Privacy Section ---
   privacy: {
-    profilePic: { 
-      type: String, 
-      enum: ["everyone", "contacts", "nobody"], 
-      default: "everyone" 
+    profilePic: {
+      type: String,
+      enum: ["everyone", "contacts", "nobody"],
+      default: "everyone"
     },
-    about: { 
-      type: String, 
-      enum: ["everyone", "contacts", "nobody"], 
-      default: "everyone" 
+    about: {
+      type: String,
+      enum: ["everyone", "contacts", "nobody"],
+      default: "everyone"
     },
-    status: { 
-      type: String, 
-      enum: ["everyone", "contacts", "nobody"], 
-      default: "everyone" 
+    status: {
+      type: String,
+      enum: ["everyone", "contacts", "nobody"],
+      default: "everyone"
     },
-    lastSeen: { 
-      type: String, 
-      enum: ["everyone", "contacts", "nobody"], 
-      default: "everyone" 
+    lastSeen: {
+      type: String,
+      enum: ["everyone", "contacts", "nobody"],
+      default: "everyone"
     }
   },
-  
+
   // Blocked users ki list store karne ke liye
   blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  
+
   profilePic: {
     type: String,
     default: "" // Shuruat mein khali rahega
@@ -60,4 +60,4 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model("User", userSchema, "chat");
+module.exports = mongoose.model("User", userSchema, "users");

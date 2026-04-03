@@ -1,5 +1,5 @@
 const express = require("express");
-const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy } = require("../controllers/userController");
+const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy,registerUser } = require("../controllers/userController");
 const router = express.Router();
 const multer = require("multer");
 const path = require("path");
@@ -30,13 +30,14 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.post("/login", loginUser);
+router.post("/register", registerUser);
 
-router.post("/update-profile/:id", upload.single("image"), updateProfile);
+router.post("/update-profile/:id",authMiddleware, upload.single("image"), updateProfile);
 // router.get("/profile", ...)
 router.get("/profile", authMiddleware, getUserProfile);
-router.post("/update-privacy/:id", updatePrivacy);
+router.post("/update-privacy/:id",authMiddleware, updatePrivacy);
 
-router.post('/status/upload', upload.array('statusMedia'), (req, res) => {
+router.post('/status/upload',authMiddleware, upload.array('statusMedia'), (req, res) => {
     // req.files contains the uploaded file info
     // req.body.captions contains the text
     

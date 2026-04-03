@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const uploadController = require("../controllers/uploadController");
+const authMiddleware = require("../config/authMiddleware");
 const fs = require("fs");
 const path = require('path');
 // ✅ Multer Storage Setup
@@ -37,7 +38,7 @@ const upload = multer({
 });
 
 // ✅ Route: POST /api/upload
-router.post("/", (req, res, next) => {
+router.post("/",authMiddleware, (req, res, next) => {
     upload.array("files")(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             // A Multer error occurred when uploading.
@@ -51,7 +52,7 @@ router.post("/", (req, res, next) => {
     });
 }, uploadController.uploadFiles);
 
-router.get("/download", (req, res) => {
+router.get("/download",authMiddleware, (req, res) => {
     const fileName = req.query.file;
 
     // path.resolve starts from the project root

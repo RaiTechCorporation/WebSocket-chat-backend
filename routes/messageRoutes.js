@@ -3,6 +3,6 @@ const { getMessages ,getAllMessages} = require("../controllers/messageController
 const router = express.Router();
 const authMiddleware = require("../config/authMiddleware");
 router.get("/message/:user1/:user2",authMiddleware, getMessages);
-router.get("/all/:userId", getAllMessages);
+router.get("/all/:userId",authMiddleware, getAllMessages);
 
 module.exports = router;

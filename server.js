@@ -14,7 +14,9 @@ const path = require("path");
 const app = express();
 const server = http.createServer(app);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./config/swagger");
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(cors());
 app.use(express.json());
 
