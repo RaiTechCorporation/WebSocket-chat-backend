@@ -266,47 +266,31 @@ const socketHandler = (io) => {
     });
 
 
-    socket.on("upload_status", async (data) => {
-      const { userId, stories } = data;
-      console.log("Received status upload:", data);
-      try {
-        // 1. Status Update/Create
-        const updatedStatus = await Status.findOneAndUpdate(
-          { userId: userId },
-          {
-            $push: { stories: { $each: stories } },
-            $set: { createdAt: new Date() }
-          },
-          {
-            upsert: true,
-            returnDocument: 'after'
-          }
-        ).populate("userId", "name profileImg");
+// socket.on("upload_status", async ({ userId, stories }) => {
+//   try {
+//     const updatedStatus = await Status.findOneAndUpdate(
+//       { userId },
+//       {
+//         $push: { stories: { $each: stories } },
+//         $set: { createdAt: new Date() }
+//       },
+//       { upsert: true, new: true }
+//     ).populate("userId", "name profileImg");
 
-        // 2. Sender ka User data nikalen (Contacts ke saath)
-        // Yahan 'contacts' populate karne se pehle check karein schema
-        const user = await User.findById(userId).populate({
-          path: 'contacts',
-          options: { strictPopulate: false } // Agar error bypass karni ho toh
-        });
+//     // 👇 contacts ko bhejo
+//     const user = await User.findById(userId).populate("contacts");
 
-        if (user && user.contacts && user.contacts.length > 0) {
-          user.contacts.forEach(contact => {
-            const contactId = contact._id.toString();
-            const contactSocket = users[contactId]; // Global users object se socket ID check karein
+//     user.contacts.forEach(contact => {
+//       const contactSocket = users[contact._id.toString()];
+//       if (contactSocket) {
+//         io.to(contactSocket).emit("status_update_received", updatedStatus);
+//       }
+//     });
 
-            if (contactSocket) {
-              // Sirf unhe bhejें jo online hain
-              io.to(contactSocket).emit("status_update_received", updatedStatus);
-              console.log(`Status broadcasted to: ${contactId}`);
-            }
-          });
-        }
-
-      } catch (err) {
-        console.error("Status Save Error:", err);
-      }
-    });
+//   } catch (err) {
+//     console.error(err);
+//   }
+// });
     socket.on("disconnect", async () => {
       let userId;
 

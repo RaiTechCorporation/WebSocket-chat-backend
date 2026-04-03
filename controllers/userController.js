@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
+const Status = require("../models/statusSchema");
 
 
 // GET all users
@@ -190,5 +190,116 @@ exports.updatePrivacy = async (req, res) => {
     res.status(200).json({ success: true, user: updatedUser });
   } catch (err) {
     res.status(500).json({ message: "Database update failed" });
+  }
+};
+
+
+
+// controllers/statusController.js
+
+exports.uploadStatus = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    let stories = [];
+
+    // 1. Agar Media Files hain (Image/Video)
+    if (req.files && req.files.length > 0) {
+      stories = req.files.map((file, index) => ({
+        url: `${baseUrl}/uploads/${file.filename}`,
+        type: file.mimetype.startsWith("video") ? "video" : "image",
+        caption: Array.isArray(req.body.captions) 
+                 ? req.body.captions[index] 
+                 : req.body.captions || ""
+      }));
+    } 
+    // 2. Agar Text Status hai
+    else if (req.body.type === "text") {
+      stories.push({
+        type: "text",
+        text: req.body.text, // 'content' ka naya naam 'text'
+        backgroundColor: req.body.backgroundColor || "#075E54",
+        createdAt: new Date()
+      });
+    }
+
+    if (stories.length === 0) {
+      return res.status(400).json({ success: false, message: "No status data provided" });
+    }
+
+    // 3. Database Update
+    const updatedStatus = await Status.findOneAndUpdate(
+      { userId },
+      {
+        $push: { stories: { $each: stories } },
+        $set: { createdAt: new Date() }
+      },
+      { upsert: true, new: true } // 'new: true' returns updated doc
+    ).populate("userId", "name profileImg");
+
+    // 4. Socket Broadcast
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("status_update_received", updatedStatus);
+    }
+
+    res.json({
+      success: true,
+      status: updatedStatus
+    });
+
+  } catch (err) {
+    console.error("Upload Error:", err);
+    res.status(500).json({ success: false });
+  }
+};
+exports.getStatuses = async (req, res) => {
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const statuses = await Status.find({
+      "stories.createdAt": { $gte: last24Hours }
+    })
+      .populate("userId", "name profilePic")
+      .sort({ createdAt: -1 });
+
+    const updatedStatuses = statuses.map((status) => {
+      // 1. Stories ke URLs fix karein
+      const updatedStories = status.stories.map((story) => ({
+        ...story._doc,
+        url: story.url.startsWith("http")
+          ? story.url
+          : `${baseUrl}${story.url}`
+      }));
+
+      // 2. User Profile Image fix karein
+      // Hum spread use karenge taaki original document change na ho, bas return object update ho
+      const user = { ...status.userId._doc };
+
+      if (user.profilePic && !user.profilePic.startsWith("http")) {
+        // Dhyaan dein: Agar aapka static folder '/uploads' hai, toh URL sahi hai
+        user.profilePic = `${baseUrl}/uploads/${user.profilePic}`;
+      } else if (!user.profilePic) {
+        // Safety: Agar image na ho toh default avatar return kar sakte hain
+        user.profilePic = `${baseUrl}/uploads/default-avatar.png`;
+      }
+
+      // 3. Final Object return karein
+      return {
+        ...status._doc,
+        stories: updatedStories,
+        userId: user // Updated user object with full image URL
+      };
+    });
+
+    res.json({
+      success: true,
+      statuses: updatedStatuses
+    });
+
+  } catch (err) {
+    console.error("Status Fetch Error:", err);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };

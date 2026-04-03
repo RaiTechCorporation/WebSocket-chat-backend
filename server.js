@@ -3,7 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 require("dotenv").config();
-
+const os = require('os');
 
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
@@ -12,6 +12,7 @@ const uploadRoutes = require("./routes/uploadRoutes")
 const socketHandler = require("./socket/socket");
 const path = require("path");
 const app = express();
+const IP_ADDRESS = "0.0.0.0"; // Sabhi network interfaces ke liye
 const server = http.createServer(app);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 const swaggerUi = require("swagger-ui-express");
@@ -40,7 +41,37 @@ const io = new Server(server, {
   },
 });
 
-
+// 🔥 YE WALA PART ADD KAREIN (Root Route)
+app.get("/", (req, res) => {
+  res.status(200).send({
+    status: "success",
+    message: "API is running successfully! 🚀",
+    docs: `http://${myIP}:9000/api-docs`
+  });
+  });
+app.set("io", io);
+// users global rakho
+global.users = {};
 socketHandler(io);
 
-server.listen(9000, () => console.log("Server running on 9000"));
+function getIPAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const devName in interfaces) {
+    const iface = interfaces[devName];
+    for (let i = 0; i < iface.length; i++) {
+      const alias = iface[i];
+      if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
+        return alias.address;
+      }
+    }
+  }
+  return '0.0.0.0';
+}
+
+const myIP = getIPAddress();
+console.log("Aapka IP Address hai:", myIP);
+
+// Server listen karte waqt iska use karein
+server.listen(9000, "0.0.0.0", () => {
+  console.log(`Server is running at http://${myIP}:9000`);
+});

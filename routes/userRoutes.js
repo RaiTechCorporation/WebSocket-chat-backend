@@ -1,12 +1,12 @@
 const express = require("express");
-const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy,registerUser } = require("../controllers/userController");
+const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy,registerUser,uploadStatus,getStatuses } = require("../controllers/userController");
 const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const authMiddleware = require("../config/authMiddleware");
 router.get("/", getUsers);
 const User = require("../models/User");
-const Status = require("../models/statusSchema");
+
 const fs = require('fs');
 
 // Folder path define karein
@@ -37,22 +37,18 @@ router.post("/update-profile/:id",authMiddleware, upload.single("image"), update
 router.get("/profile", authMiddleware, getUserProfile);
 router.post("/update-privacy/:id",authMiddleware, updatePrivacy);
 
-router.post('/status/upload',authMiddleware, upload.array('statusMedia'), (req, res) => {
-    // req.files contains the uploaded file info
-    // req.body.captions contains the text
-    
-    const savedFiles = req.files.map((file, index) => ({
-        url: `/uploads/${file.filename}`,
-        type: file.mimetype.startsWith('video') ? 'video' : 'image',
-        caption: req.body.captions[index]
-    }));
+router.post(
+  "/status/upload",
+  authMiddleware,
+  upload.array("statusMedia"),
+  uploadStatus
+);
 
-    
-    // Save to Database logic here...
-
-    res.json({ success: true, savedFiles });
-});
-
+router.get(
+  "/status",
+  authMiddleware,
+  getStatuses
+);
 
 
 module.exports = router;

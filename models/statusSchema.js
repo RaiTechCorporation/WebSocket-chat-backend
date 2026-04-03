@@ -6,13 +6,15 @@ const statusSchema = new mongoose.Schema({
         ref: "User", 
         required: true 
     },
-    contacts: [{ 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: "User" 
-    }],
+
     stories: [{
         url: String,         // Image/Video path
         type: { type: String, enum: ["image", "video", "text"] },
+        text: String,        // ✅ Naya field Text Status ke liye
+        backgroundColor: {   // ✅ Naya field background color ke liye
+            type: String, 
+            default: "#075E54" 
+        },
         caption: String,
         createdAt: { type: Date, default: Date.now }
     }],

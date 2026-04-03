@@ -2,10 +2,16 @@ const mongoose = require("mongoose");
 
 const connectDB = async () => {
   try {
-    await mongoose.connect("mongodb://127.0.0.1:27017/chat");
-    console.log("MongoDB Connected");
+    // 1. Username aur Password string mein add karein
+    // 2. ?authSource=admin zaroori hai kyunki user admin DB mein bana hai
+    const dbURI = "mongodb://admin:StrongPassword%402026@168.231.119.214:27017/chat?authSource=admin";
+
+    await mongoose.connect(dbURI);
+    
+    console.log("✅ MongoDB Connected Successfully");
   } catch (err) {
-    console.log(err);
+    console.error("❌ MongoDB Connection Error:", err.message);
+    process.exit(1); // Error aane par process stop kar dein
   }
 };
 
