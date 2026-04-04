@@ -12,6 +12,7 @@ const uploadRoutes = require("./routes/uploadRoutes")
 const socketHandler = require("./socket/socket");
 const path = require("path");
 const app = express();
+const blockRoutes = require("./routes/blockRoutes");
 const IP_ADDRESS = "0.0.0.0"; // Sabhi network interfaces ke liye
 const server = http.createServer(app);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -28,7 +29,7 @@ connectDB();
 app.use("/users", userRoutes);
 app.use("/messages", messageRoutes);
 app.use("/uploads", uploadRoutes);
-
+app.use("/api", blockRoutes);
 
 
 
