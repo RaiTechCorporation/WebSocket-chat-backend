@@ -25,21 +25,21 @@ exports.blockUser = async (req, res) => {
     });
 
     // 🔥 socket emit
- const io = req.app.get("io");
+    const io = req.app.get("io");
 
-if (io) {
-  // receiver ko
-  io.to(userId).emit("blocked", {
-    by: blockerId,
-    blockedUser: userId,
-  });
+    if (io) {
+      // receiver ko
+      io.to(userId).emit("blocked", {
+        by: blockerId,
+        blockedUser: userId,
+      });
 
-  // sender ko
-  io.to(blockerId).emit("blocked", {
-    by: blockerId,
-    blockedUser: userId,
-  });
-}
+      // sender ko
+      io.to(blockerId).emit("blocked", {
+        by: blockerId,
+        blockedUser: userId,
+      });
+    }
 
     res.json({ message: "User blocked successfully", block });
   } catch (err) {
@@ -47,7 +47,7 @@ if (io) {
   }
 };
 
-exports.getBlockedUsers = async (req, res) => {
+exports.getBlockedUsersList = async (req, res) => {
   try {
     const userId = req.user.userId;
 
@@ -55,6 +55,28 @@ exports.getBlockedUsers = async (req, res) => {
       .populate("blocked", "name email");
 
     res.json(blockedUsers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+// Controller mein change: Un logo ko bhi fetch karo jinhone mujhe block kiya hai
+exports.getBlockedUsers = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { targetUserId } = req.params;
+    console.log("targetUserId",targetUserId)
+    console.log("Fetching block status between:", userId, "and", targetUserId);
+
+    const blockStatus = await Block.findOne({
+      $or: [
+        { blocker: userId, blocked: targetUserId }, // Maine use block kiya
+        { blocker: targetUserId, blocked: userId }  // Usne mujhe block kiya
+      ]
+    });
+
+    res.json({ isBlocked: !!blockStatus, details: blockStatus });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -208,11 +208,11 @@ exports.uploadStatus = async (req, res) => {
       stories = req.files.map((file, index) => ({
         url: `${baseUrl}/uploads/${file.filename}`,
         type: file.mimetype.startsWith("video") ? "video" : "image",
-        caption: Array.isArray(req.body.captions) 
-                 ? req.body.captions[index] 
-                 : req.body.captions || ""
+        caption: Array.isArray(req.body.captions)
+          ? req.body.captions[index]
+          : req.body.captions || ""
       }));
-    } 
+    }
     // 2. Agar Text Status hai
     else if (req.body.type === "text") {
       stories.push({
