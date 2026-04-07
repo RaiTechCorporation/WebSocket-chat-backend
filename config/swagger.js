@@ -211,6 +211,97 @@ swaggerSpec.paths = {
         },
     },
 
+    "/users/status": {
+  get: {
+    summary: "Get user statuses (last 24 hours)",
+    tags: ["Users"],
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
+    responses: {
+      200: {
+        description: "Statuses fetched successfully",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: {
+                  type: "boolean",
+                  example: true,
+                },
+                statuses: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      _id: {
+                        type: "string",
+                        example: "661234abcd1234",
+                      },
+                      userId: {
+                        type: "object",
+                        properties: {
+                          _id: {
+                            type: "string",
+                            example: "661111abcd1111",
+                          },
+                          name: {
+                            type: "string",
+                            example: "John Doe",
+                          },
+                          profilePic: {
+                            type: "string",
+                            example: "http://localhost:3000/uploads/profile.jpg",
+                          },
+                        },
+                      },
+                      stories: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            _id: {
+                              type: "string",
+                            },
+                            url: {
+                              type: "string",
+                              example: "http://localhost:3000/uploads/status1.jpg",
+                            },
+                            caption: {
+                              type: "string",
+                              example: "My status",
+                            },
+                            createdAt: {
+                              type: "string",
+                              format: "date-time",
+                            },
+                          },
+                        },
+                      },
+                      createdAt: {
+                        type: "string",
+                        format: "date-time",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      401: {
+        description: "Unauthorized",
+      },
+      500: {
+        description: "Internal Server Error",
+      },
+    },
+  },
+},
     // =========================
     // 🔐 GET MESSAGES BETWEEN USERS
     // =========================
