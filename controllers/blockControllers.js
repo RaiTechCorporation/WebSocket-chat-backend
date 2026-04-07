@@ -26,7 +26,6 @@ exports.blockUser = async (req, res) => {
 
     // 🔥 socket emit
     const io = req.app.get("io");
-
     if (io) {
       // receiver ko
       io.to(userId).emit("blocked", {
@@ -52,7 +51,7 @@ exports.getBlockedUsersList = async (req, res) => {
     const userId = req.user.userId;
 
     const blockedUsers = await Block.find({ blocker: userId })
-      .populate("blocked", "name email");
+      .populate("blocked", "name email profilePic");
 
     res.json(blockedUsers);
   } catch (err) {
@@ -66,7 +65,7 @@ exports.getBlockedUsers = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { targetUserId } = req.params;
-    console.log("targetUserId",targetUserId)
+    console.log("targetUserId", targetUserId)
     console.log("Fetching block status between:", userId, "and", targetUserId);
 
     const blockStatus = await Block.findOne({

@@ -275,7 +275,7 @@ const socketHandler = (io) => {
     //         $set: { createdAt: new Date() }
     //       },
     //       { upsert: true, new: true }
-    //     ).populate("userId", "name profileImg");
+    //     ).populate("userId", "name profilePic");
 
     //     // 👇 contacts ko bhejo
     //     const user = await User.findById(userId).populate("contacts");

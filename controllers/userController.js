@@ -2,14 +2,70 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Status = require("../models/statusSchema");
+exports.checkIsBlocked = async (userId, targetUserId) => {
+  const block = await Block.findOne({
+    $or: [
+      { blocker: userId, blocked: targetUserId },
+      { blocker: targetUserId, blocked: userId },
+    ],
+  });
 
-
-// GET all users
-exports.getUsers = async (req, res) => {
-  const users = await User.find();
-  res.json(users);
+  return !!block;
 };
 
+// GET all users
+const Block = require("../models/Block");
+
+exports.getUsers = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId; // Jo user login hai
+    const users = await User.find(); // Saare users fetch kiye
+
+    const updatedUsers = await Promise.all(
+      users.map(async (user) => {
+        // --- A. BLOCKING CHECK ---
+        const block = await Block.findOne({
+          $or: [
+            { blocker: currentUserId, blocked: user._id },
+            { blocker: user._id, blocked: currentUserId },
+          ],
+        });
+        const isBlocked = !!block;
+
+        // --- B. PRIVACY HELPER LOGIC ---
+        const isOwner = currentUserId.toString() === user._id.toString();
+        const isContact = user.contacts?.includes(currentUserId);
+
+        const checkField = (setting) => {
+          if (isOwner || setting === "everyone") return true;
+          if (setting === "nobody") return false;
+          if (setting === "contacts") return isContact;
+          return false;
+        };
+
+        // --- C. APPLYING FILTERS ---
+        // Agar blocked hai toh sab hidden, warna privacy check karo
+        const showPic = !isBlocked && checkField(user.privacy.profilePic);
+        const showAbout = !isBlocked && checkField(user.privacy.about);
+        const showLastSeen = !isBlocked && checkField(user.privacy.lastSeen);
+
+        return {
+          _id: user._id,
+          name: user.name,
+          profilePic: showPic ? user.profilePic : null, // Backend se null bhejo
+          about: showAbout ? user.about : "",
+          lastSeen: showLastSeen ? user.lastSeen : null,
+          status: !isBlocked ? user.status : "offline",
+          isBlocked,
+        };
+      })
+    );
+
+    res.json(updatedUsers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
 exports.registerUser = async (req, res) => {
   try {
@@ -235,7 +291,7 @@ exports.uploadStatus = async (req, res) => {
         $set: { createdAt: new Date() }
       },
       { upsert: true, new: true } // 'new: true' returns updated doc
-    ).populate("userId", "name profileImg");
+    ).populate("userId", "name profilePic");
 
     // 4. Socket Broadcast
     const io = req.app.get("io");
@@ -253,6 +309,7 @@ exports.uploadStatus = async (req, res) => {
     res.status(500).json({ success: false });
   }
 };
+
 exports.getStatuses = async (req, res) => {
   try {
     const baseUrl = `${req.protocol}://${req.get("host")}`;

@@ -300,6 +300,156 @@ swaggerSpec.paths = {
             },
         },
     },
+    // =========================
+// 🚫 BLOCK USERS
+// =========================
+
+"/api/block": {
+    post: {
+        summary: "Block a user",
+        tags: ["Block"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+            required: true,
+            content: {
+                "application/json": {
+                    schema: {
+                        type: "object",
+                        properties: {
+                            userId: {
+                                type: "string",
+                                example: "64f123abc123"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        responses: {
+            200: {
+                description: "User blocked successfully"
+            },
+            400: {
+                description: "User already blocked or invalid request"
+            }
+        }
+    }
+},
+
+// =========================
+// 📊 BLOCK STATUS
+// =========================
+
+"/api/blocked-status/{targetUserId}": {
+    get: {
+        summary: "Check block status between users",
+        tags: ["Block"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+            {
+                name: "targetUserId",
+                in: "path",
+                required: true,
+                schema: {
+                    type: "string"
+                },
+                example: "64f123abc456"
+            }
+        ],
+        responses: {
+            200: {
+                description: "Block status fetched",
+                content: {
+                    "application/json": {
+                        schema: {
+                            type: "object",
+                            properties: {
+                                isBlocked: {
+                                    type: "boolean",
+                                    example: true
+                                },
+                                details: {
+                                    type: "object",
+                                    nullable: true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+},
+
+// =========================
+// 📥 GET BLOCKED USERS
+// =========================
+
+"/api/blocked-users": {
+    get: {
+        summary: "Get all blocked users list",
+        tags: ["Block"],
+        security: [{ bearerAuth: [] }],
+        responses: {
+            200: {
+                description: "List of blocked users",
+                content: {
+                    "application/json": {
+                        schema: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    _id: { type: "string" },
+                                    blocked: {
+                                        type: "object",
+                                        properties: {
+                                            name: { type: "string" },
+                                            email: { type: "string" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+},
+
+// =========================
+// 🟢 UNBLOCK USER
+// =========================
+
+"/api/unblock": {
+    post: {
+        summary: "Unblock a user",
+        tags: ["Block"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+            required: true,
+            content: {
+                "application/json": {
+                    schema: {
+                        type: "object",
+                        properties: {
+                            blockedId: {
+                                type: "string",
+                                example: "64f123abc456"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        responses: {
+            200: {
+                description: "User unblocked successfully"
+            }
+        }
+    }
+}
 };
 
 module.exports = swaggerSpec;

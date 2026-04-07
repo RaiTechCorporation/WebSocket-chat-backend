@@ -1,10 +1,11 @@
 const express = require("express");
-const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy,registerUser,uploadStatus,getStatuses } = require("../controllers/userController");
+const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy, registerUser, uploadStatus, getStatuses } = require("../controllers/userController");
 const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const authMiddleware = require("../config/authMiddleware");
-router.get("/", getUsers);
+const checkPrivacy = require("../config/checkPrivacy");
+router.get("/", authMiddleware, getUsers);
 const User = require("../models/User");
 
 const fs = require('fs');
@@ -32,10 +33,10 @@ const upload = multer({ storage: storage });
 router.post("/login", loginUser);
 router.post("/register", registerUser);
 
-router.post("/update-profile/:id",authMiddleware, upload.single("image"), updateProfile);
+router.post("/update-profile/:id", authMiddleware, upload.single("image"), updateProfile);
 // router.get("/profile", ...)
 router.get("/profile", authMiddleware, getUserProfile);
-router.post("/update-privacy/:id",authMiddleware, updatePrivacy);
+router.post("/update-privacy/:id", authMiddleware, updatePrivacy);
 
 router.post(
   "/status/upload",
