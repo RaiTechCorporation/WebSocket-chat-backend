@@ -26,7 +26,9 @@ exports.blockUser = async (req, res) => {
 
     // 🔥 socket emit
     const io = req.app.get("io");
+    console.log("io",io)
     if (io) {
+
       // receiver ko
       io.to(userId).emit("blocked", {
         by: blockerId,
@@ -39,6 +41,8 @@ exports.blockUser = async (req, res) => {
         blockedUser: userId,
       });
     }
+
+
 
     res.json({ message: "User blocked successfully", block });
   } catch (err) {

@@ -1,5 +1,5 @@
 const express = require("express");
-const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy, registerUser, uploadStatus, getStatuses } = require("../controllers/userController");
+const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy, registerUser, uploadStatus, getStatuses,logoutUser,updateStatusPrivacy } = require("../controllers/userController");
 const router = express.Router();
 const multer = require("multer");
 const path = require("path");
@@ -37,6 +37,7 @@ router.post("/update-profile/:id", authMiddleware, upload.single("image"), updat
 // router.get("/profile", ...)
 router.get("/profile", authMiddleware, getUserProfile);
 router.post("/update-privacy/:id", authMiddleware, updatePrivacy);
+router.post("/logout", logoutUser);
 
 router.post(
   "/status/upload",
@@ -50,6 +51,10 @@ router.get(
   authMiddleware,
   getStatuses
 );
-
+router.post(
+  "/status-privacy",
+  authMiddleware,
+  updateStatusPrivacy
+);
 
 module.exports = router;

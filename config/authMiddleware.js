@@ -1,23 +1,29 @@
 const jwt = require("jsonwebtoken");
-
-const authMiddleware = (req, res, next) => {
+const BlacklistedToken = require("../models/BlacklistedToken")
+const authMiddleware = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    const token = req.headers.authorization?.split(" ")[1];
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "No or invalid token format" });
+    if (!token) {
+      return res.status(401).json({ message: "No token" });
     }
 
-    const token = authHeader.split(" ")[1];
+    // 🔴 Check blacklist
+    const isBlacklisted = await BlacklistedToken.findOne({ token });
 
-    const decoded = jwt.verify(token, "key");
+    if (isBlacklisted) {
+      return res.status(401).json({
+        success: false,
+        message: "Token expired, please login again",
+      });
+    }
 
+    // ✅ Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "key");
     req.user = decoded;
 
     next();
-  } catch (error) {
-    console.log(error.message); // 👈 debug ke liye
-
+  } catch (err) {
     return res.status(401).json({ message: "Invalid token" });
   }
 };

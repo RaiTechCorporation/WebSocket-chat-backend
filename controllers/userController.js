@@ -2,13 +2,19 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Status = require("../models/statusSchema");
+const ChatMeta = require("../models/chatMeta")
+const BlacklistedToken = require("../models/BlacklistedToken")
 exports.checkIsBlocked = async (userId, targetUserId) => {
+  console.log("Checking block:", userId, targetUserId);
+
   const block = await Block.findOne({
     $or: [
       { blocker: userId, blocked: targetUserId },
       { blocker: targetUserId, blocked: userId },
     ],
   });
+
+  console.log("Block result:", block);
 
   return !!block;
 };
@@ -18,11 +24,12 @@ const Block = require("../models/Block");
 
 exports.getUsers = async (req, res) => {
   try {
-    const currentUserId = req.user.userId; // Jo user login hai
-    const users = await User.find(); // Saare users fetch kiye
+    const currentUserId = req.user.userId;
+    const users = await User.find();
 
     const updatedUsers = await Promise.all(
       users.map(async (user) => {
+
         // --- A. BLOCKING CHECK ---
         const block = await Block.findOne({
           $or: [
@@ -44,19 +51,27 @@ exports.getUsers = async (req, res) => {
         };
 
         // --- C. APPLYING FILTERS ---
-        // Agar blocked hai toh sab hidden, warna privacy check karo
         const showPic = !isBlocked && checkField(user.privacy.profilePic);
         const showAbout = !isBlocked && checkField(user.privacy.about);
         const showLastSeen = !isBlocked && checkField(user.privacy.lastSeen);
 
+        // ✅ D. UNREAD COUNT ADD
+        const meta = await ChatMeta.findOne({
+          userId: currentUserId,   // 👈 current user
+          chatWith: user._id,      // 👈 us user ka chat
+        });
+
         return {
           _id: user._id,
           name: user.name,
-          profilePic: showPic ? user.profilePic : null, // Backend se null bhejo
+          profilePic: showPic ? user.profilePic : null,
           about: showAbout ? user.about : "",
           lastSeen: showLastSeen ? user.lastSeen : null,
-          status: !isBlocked ? user.status : "offline",
+          status: !isBlocked ? user.status : "",
           isBlocked,
+
+          // ✅ ADD THIS
+          unreadCount: meta?.unreadCount || 0,
         };
       })
     );
@@ -171,6 +186,32 @@ exports.loginUser = async (req, res) => {
   }
 };
 
+exports.logoutUser = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Token required",
+      });
+    }
+
+    // Save token to blacklist
+    await BlacklistedToken.create({ token });
+
+    res.json({
+      success: true,
+      message: "Logout successful",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 
 exports.getUserProfile = async (req, res) => {
   try {
@@ -312,51 +353,119 @@ exports.uploadStatus = async (req, res) => {
 
 exports.getStatuses = async (req, res) => {
   try {
+    // ✅ FIX HERE
+    const currentUserId = req.user.userId;
+
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
+    // 🔥 Get blocked users
+    const blockedUsers = await Block.find({
+      $or: [
+        { blocker: currentUserId },
+        { blocked: currentUserId },
+      ],
+    });
+    console.log("blockedUsers", blockedUsers)
+    const blockedUserIds = blockedUsers.map((b) =>
+      b.blocker.equals(currentUserId)
+        ? b.blocked
+        : b.blocker
+    );
+
+    console.log("Blocked Users:", blockedUserIds); // 🧪 DEBUG
+
+    // 🔥 Fetch statuses
     const statuses = await Status.find({
-      "stories.createdAt": { $gte: last24Hours }
+      "stories.createdAt": { $gte: last24Hours },
+      userId: { $nin: blockedUserIds },
     })
       .populate("userId", "name profilePic")
       .sort({ createdAt: -1 });
 
     const updatedStatuses = statuses.map((status) => {
-      // 1. Stories ke URLs fix karein
       const updatedStories = status.stories.map((story) => ({
         ...story._doc,
         url: story.url.startsWith("http")
           ? story.url
-          : `${baseUrl}${story.url}`
+          : `${baseUrl}${story.url}`,
       }));
 
-      // 2. User Profile Image fix karein
-      // Hum spread use karenge taaki original document change na ho, bas return object update ho
       const user = { ...status.userId._doc };
 
       if (user.profilePic && !user.profilePic.startsWith("http")) {
-        // Dhyaan dein: Agar aapka static folder '/uploads' hai, toh URL sahi hai
         user.profilePic = `${baseUrl}/uploads/${user.profilePic}`;
       } else if (!user.profilePic) {
-        // Safety: Agar image na ho toh default avatar return kar sakte hain
         user.profilePic = `${baseUrl}/uploads/default-avatar.png`;
       }
 
-      // 3. Final Object return karein
       return {
         ...status._doc,
         stories: updatedStories,
-        userId: user // Updated user object with full image URL
+        userId: user,
       };
     });
 
     res.json({
       success: true,
-      statuses: updatedStatuses
+      statuses: updatedStatuses,
+    });
+  } catch (err) {
+    console.error("Status Fetch Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+
+exports.updateStatusPrivacy = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const {
+      type,            // ALL | EXCEPT | ONLY
+      exceptUsers = [],
+      onlyUsers = []
+    } = req.body;
+
+    // 🔒 validation
+    if (type === "EXCEPT" && exceptUsers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Select users to exclude"
+      });
+    }
+
+    if (type === "ONLY" && onlyUsers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Select users to share with"
+      });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        statusPrivacy: {
+          type,
+          exceptUsers: type === "EXCEPT" ? exceptUsers : [],
+          onlyUsers: type === "ONLY" ? onlyUsers : []
+        }
+      },
+      { new: true }
+    );
+
+    res.json({
+      success: true,
+      message: "Privacy updated",
+      data: updatedUser.statusPrivacy
     });
 
   } catch (err) {
-    console.error("Status Fetch Error:", err);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    console.error(err);
+    res.status(500).json({ success: false });
   }
 };
+

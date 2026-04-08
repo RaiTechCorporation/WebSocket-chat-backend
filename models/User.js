@@ -49,6 +49,15 @@ const userSchema = new mongoose.Schema({
   // Blocked users ki list store karne ke liye
   blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 contacts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  statusPrivacy: {
+    type: {
+      type: String,
+      enum: ["ALL", "EXCEPT", "ONLY"],
+      default: "ALL"
+    },
+    exceptUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    onlyUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
+  },
 
   profilePic: {
     type: String,

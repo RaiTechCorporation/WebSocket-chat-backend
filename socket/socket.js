@@ -3,7 +3,8 @@ const Message = require("../models/Message");
 const fs = require("fs");
 const path = require("path");
 const User = require("../models/User");
-const Status = require("../models/statusSchema");
+const Status = require("../models/statusSchema"); 
+const ChatMeta = require("../models/chatMeta")
 
 
 let users = {}; // { userId: socketId }
@@ -57,6 +58,18 @@ const socketHandler = (io) => {
 
         io.to(receiverSocket).emit("private_message", newMsg); // send to receiver
         io.to(socket.id).emit("private_message", newMsg); // send to sender
+
+  // ✅ ADD THIS 👇
+  const unreadCount = await Message.countDocuments({
+    senderId,
+    receiverId,
+    status: { $ne: "seen" },
+  });
+
+  io.to(receiverSocket).emit("unread_count", {
+    senderId,
+    count: unreadCount,
+  });
       } else {
         io.to(socket.id).emit("private_message", newMsg); // offline: only sender sees
       }
@@ -114,26 +127,39 @@ const socketHandler = (io) => {
     });
 
     // 4️⃣ Mark messages as seen
-    socket.on("markSeen", async ({ senderId, receiverId }) => {
-      try {
-        await Message.updateMany(
-          {
-            senderId,
-            receiverId,
-            status: { $ne: "seen" },
-          },
-          { status: "seen" }
-        );
+socket.on("markSeen", async ({ senderId, receiverId }) => {
+  try {
+    // 1️⃣ Messages seen
+    await Message.updateMany(
+      {
+        senderId,
+        receiverId,
+        status: { $ne: "seen" },
+      },
+      { status: "seen" }
+    );
 
-        const senderSocket = users[senderId];
-        if (senderSocket) {
-          io.to(senderSocket).emit("messagesSeen", { senderId, receiverId });
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    });
+    // 2️⃣ Reset unread in DB
+    await ChatMeta.findOneAndUpdate(
+      { userId: receiverId, chatWith: senderId },
+      { unreadCount: 0 },
+      { upsert: true }
+    );
 
+    // 3️⃣ Emit to CURRENT USER (who opened chat)
+    const currentUserSocket = users[receiverId];
+console.log("currentUserSocket",currentUserSocket)
+    if (currentUserSocket) {
+      io.to(currentUserSocket).emit("unread_count", {
+        senderId, // kis user ka unread reset hua
+        count: 0,
+      });
+    }
+
+  } catch (err) {
+    console.error("markSeen error:", err);
+  }
+});
 
 
     // 5️⃣ Delete message (everyone / me)

@@ -111,6 +111,35 @@ swaggerSpec.paths = {
     },
 
     // =========================
+// 🔐 LOGOUT
+// =========================
+"/users/logout": {
+  post: {
+    summary: "Logout user",
+    description: "Invalidate JWT token by adding it to blacklist",
+    tags: ["Auth"],
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
+    responses: {
+      200: {
+        description: "Logout successful",
+      },
+      400: {
+        description: "Token required",
+      },
+      401: {
+        description: "Unauthorized / Invalid token",
+      },
+      500: {
+        description: "Server error",
+      },
+    },
+  },
+},
+    // =========================
     // 🔐 UPDATE PROFILE
     // =========================
     "/users/update-profile/{id}": {
