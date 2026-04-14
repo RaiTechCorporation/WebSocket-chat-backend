@@ -1,5 +1,5 @@
 const express = require("express");
-const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy, registerUser, uploadStatus, getStatuses,logoutUser,updateStatusPrivacy } = require("../controllers/userController");
+const { getUsers, loginUser, getUserProfile, updateProfile, updatePrivacy, registerUser, uploadStatus, getStatuses, logoutUser, updateStatusPrivacy, addContact, getContacts, removeContact } = require("../controllers/userController");
 const router = express.Router();
 const multer = require("multer");
 const path = require("path");
@@ -56,5 +56,9 @@ router.post(
   authMiddleware,
   updateStatusPrivacy
 );
+
+router.post("/contacts", authMiddleware, addContact);
+router.get("/users/contacts", authMiddleware, getContacts);
+router.delete("/contacts/:contactId", authMiddleware, removeContact);
 
 module.exports = router;

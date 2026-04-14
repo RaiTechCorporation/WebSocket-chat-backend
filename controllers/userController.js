@@ -4,6 +4,8 @@ const jwt = require("jsonwebtoken");
 const Status = require("../models/statusSchema");
 const ChatMeta = require("../models/chatMeta")
 const BlacklistedToken = require("../models/BlacklistedToken")
+const Message = require("../models/Message")
+const {getBlockedUserIds} = require("../utils/CheckBlocked")
 exports.checkIsBlocked = async (userId, targetUserId) => {
   console.log("Checking block:", userId, targetUserId);
 
@@ -25,12 +27,24 @@ const Block = require("../models/Block");
 exports.getUsers = async (req, res) => {
   try {
     const currentUserId = req.user.userId;
-    const users = await User.find();
+    const { search } = req.query; // 👈 search query
+
+    // Search filter build karo
+    let searchFilter = {};
+    if (search && search.trim() !== "") {
+      searchFilter = {
+        $or: [
+          { name: { $regex: search, $options: "i" } },   // name se search
+          { email: { $regex: search, $options: "i" } },  // email se search
+        ],
+      };
+    }
+
+    const users = await User.find(searchFilter); // 👈 filter apply
 
     const updatedUsers = await Promise.all(
       users.map(async (user) => {
 
-        // --- A. BLOCKING CHECK ---
         const block = await Block.findOne({
           $or: [
             { blocker: currentUserId, blocked: user._id },
@@ -39,7 +53,6 @@ exports.getUsers = async (req, res) => {
         });
         const isBlocked = !!block;
 
-        // --- B. PRIVACY HELPER LOGIC ---
         const isOwner = currentUserId.toString() === user._id.toString();
         const isContact = user.contacts?.includes(currentUserId);
 
@@ -50,27 +63,24 @@ exports.getUsers = async (req, res) => {
           return false;
         };
 
-        // --- C. APPLYING FILTERS ---
         const showPic = !isBlocked && checkField(user.privacy.profilePic);
         const showAbout = !isBlocked && checkField(user.privacy.about);
         const showLastSeen = !isBlocked && checkField(user.privacy.lastSeen);
 
-        // ✅ D. UNREAD COUNT ADD
         const meta = await ChatMeta.findOne({
-          userId: currentUserId,   // 👈 current user
-          chatWith: user._id,      // 👈 us user ka chat
+          userId: currentUserId,
+          chatWith: user._id,
         });
 
         return {
           _id: user._id,
           name: user.name,
+          email: user.email,  // 👈 email bhi bhejo
           profilePic: showPic ? user.profilePic : null,
           about: showAbout ? user.about : "",
           lastSeen: showLastSeen ? user.lastSeen : null,
           status: !isBlocked ? user.status : "",
           isBlocked,
-
-          // ✅ ADD THIS
           unreadCount: meta?.unreadCount || 0,
         };
       })
@@ -334,12 +344,24 @@ exports.uploadStatus = async (req, res) => {
       { upsert: true, new: true } // 'new: true' returns updated doc
     ).populate("userId", "name profilePic");
 
-    // 4. Socket Broadcast
-    const io = req.app.get("io");
-    if (io) {
-      io.emit("status_update_received", updatedStatus);
-    }
+const io = req.app.get("io");
 
+// 👇 sab users nahi — sirf valid users ko
+const allUsers = await User.find({ _id: { $ne: userId } }).select("_id");
+
+const targetIds = allUsers.map(u => u._id.toString());
+console.log("targetIds",targetIds)
+// 🔥 blocked users nikaalo
+io.to(userId.toString()).emit("status_update_received", updatedStatus);
+
+const blockedSet = await getBlockedUserIds(userId, targetIds);
+console.log("blockedSet",blockedSet)
+// 🔥 emit only allowed users
+targetIds.forEach((id) => {
+  if (!blockedSet.has(id)) {
+    io.to(id).emit("status_update_received", updatedStatus);
+  }
+});
     res.json({
       success: true,
       status: updatedStatus
@@ -469,3 +491,249 @@ exports.updateStatusPrivacy = async (req, res) => {
   }
 };
 
+
+
+
+
+// ✅ 2. Contact add karo
+exports.addContact = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId;
+    const { contactId } = req.body;
+
+    if (!contactId) {
+      return res.status(400).json({ success: false, message: "contactId required" });
+    }
+
+    const contactUser = await User.findById(contactId);
+    if (!contactUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const currentUser = await User.findById(currentUserId);
+    if (currentUser.contacts.includes(contactId)) {
+      return res.status(400).json({ success: false, message: "Already in contacts" });
+    }
+
+    await User.findByIdAndUpdate(
+      currentUserId,
+      { $addToSet: { contacts: contactId } }
+    );
+
+    // 🔥 SOCKET EMIT
+    const io = req.app.get("io");
+
+    if (io) {
+      const payload = {
+        type: "ADD",
+        userId: currentUserId,
+        contactId,
+      };
+
+      // sender ko
+      io.to(currentUserId).emit("contact_update", payload);
+
+      // receiver ko
+      io.to(contactId).emit("contact_update", payload);
+    }
+
+    res.status(201).json({ success: true, message: "Contact added successfully" });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+
+exports.getContacts = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId;
+    const { search } = req.query;
+
+    // 👇 1. user + contacts
+    const user = await User.findById(currentUserId)
+      .populate("contacts", "-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // 👇 2. messages
+    const messages = await Message.find({
+      $or: [
+        { senderId: currentUserId },
+        { receiverId: currentUserId },
+      ],
+    });
+
+    // 👇 3. unique chat user ids
+    const chatUserIds = new Set();
+
+    messages.forEach((msg) => {
+      if (msg.senderId.toString() !== currentUserId.toString()) {
+        chatUserIds.add(msg.senderId.toString());
+      }
+      if (msg.receiverId.toString() !== currentUserId.toString()) {
+        chatUserIds.add(msg.receiverId.toString());
+      }
+    });
+
+    // 👇 4. fetch chat users
+    const chatUsers = await User.find({
+      _id: { $in: Array.from(chatUserIds) },
+    }).select("-password");
+
+    // 👇 5. merge (Map)
+    const userMap = new Map();
+
+    // contacts
+    user.contacts.forEach((u) => {
+      userMap.set(u._id.toString(), {
+        ...u.toObject(),
+        isContact: true,
+        contactId: u._id,
+      });
+    });
+
+    // chat users
+    chatUsers.forEach((u) => {
+      if (!userMap.has(u._id.toString())) {
+        userMap.set(u._id.toString(), {
+          ...u.toObject(),
+          isContact: false,
+          contactId: null,
+        });
+      }
+    });
+
+    let users = Array.from(userMap.values());
+
+    // 🔍 6. SEARCH APPLY
+    if (search && search.trim() !== "") {
+      const query = search.toLowerCase();
+
+      users = users.filter(
+        (u) =>
+          u.name?.toLowerCase().includes(query) ||
+          u.email?.toLowerCase().includes(query)
+      );
+    }
+
+    // =====================================================
+    // ✅ 7. BLOCK OPTIMIZATION (Single Query 🚀)
+    // =====================================================
+    const userIds = users.map((u) => u._id);
+
+    const blocks = await Block.find({
+      $or: [
+        { blocker: currentUserId, blocked: { $in: userIds } },
+        { blocked: currentUserId, blocker: { $in: userIds } },
+      ],
+    });
+
+    const blockedSet = new Set();
+
+    blocks.forEach((b) => {
+      if (b.blocker.toString() === currentUserId.toString()) {
+        blockedSet.add(b.blocked.toString());
+      } else {
+        blockedSet.add(b.blocker.toString());
+      }
+    });
+
+    // =====================================================
+    // ✅ 8. FINAL FORMAT (Privacy + Block Apply)
+    // =====================================================
+    users = users.map((u) => {
+      const isBlocked = blockedSet.has(u._id.toString());
+      const isOwner = currentUserId.toString() === u._id.toString();
+
+      const checkField = (setting) => {
+        if (isOwner || setting === "everyone") return true;
+        if (setting === "nobody") return false;
+        if (setting === "contacts") return u.isContact;
+        return false;
+      };
+
+      const showPic = !isBlocked && checkField(u.privacy?.profilePic);
+      const showAbout = !isBlocked && checkField(u.privacy?.about);
+      const showLastSeen = !isBlocked && checkField(u.privacy?.lastSeen);
+
+      return {
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+
+        isContact: u.isContact,
+        contactId: u.contactId,
+
+        isBlocked,
+
+        profilePic: showPic ? u.profilePic : null,
+        about: showAbout ? u.about : "",
+        lastSeen: showLastSeen ? u.lastSeen : null,
+        status: !isBlocked ? u.status : "",
+      };
+    });
+
+    // =====================================================
+    // ❌ OPTIONAL: block users hide karna ho to
+    // =====================================================
+    // users = users.filter(u => !u.isBlocked);
+
+    res.json({
+      success: true,
+      users,
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+exports.removeContact = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId;
+    const { contactId } = req.params;
+
+    const user = await User.findById(currentUserId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const exists = user.contacts.includes(contactId);
+    if (!exists) {
+      return res.status(400).json({ success: false, message: "Contact not found" });
+    }
+
+    await User.findByIdAndUpdate(
+      currentUserId,
+      { $pull: { contacts: contactId } }
+    );
+
+    // 🔥 SOCKET EMIT
+    const io = req.app.get("io");
+
+    if (io) {
+      const payload = {
+        type: "REMOVE",
+        userId: currentUserId,
+        contactId,
+      };
+
+      io.to(currentUserId).emit("contact_update", payload);
+      io.to(contactId).emit("contact_update", payload);
+    }
+
+    res.json({ success: true, message: "Contact removed successfully" });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

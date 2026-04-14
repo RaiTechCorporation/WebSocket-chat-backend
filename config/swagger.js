@@ -110,6 +110,220 @@ swaggerSpec.paths = {
         },
     },
 
+    "/users/contacts": {
+  post: {
+    summary: "Add a new contact",
+    tags: ["Users"],
+    security: [{ bearerAuth: [] }],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            required: ["contactId"],
+            properties: {
+              contactId: {
+                type: "string",
+                description: "User ID to add as contact",
+                example: "64f1c2a9b8c9d2a1e9f12345",
+              },
+            },
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: "Contact added successfully",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                message: {
+                  type: "string",
+                  example: "Contact added successfully",
+                },
+              },
+            },
+          },
+        },
+      },
+      400: {
+        description: "Bad request (missing or already exists)",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: false },
+                message: {
+                  type: "string",
+                  example: "Already in contacts",
+                },
+              },
+            },
+          },
+        },
+      },
+      404: {
+        description: "User not found",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: false },
+                message: {
+                  type: "string",
+                  example: "User not found",
+                },
+              },
+            },
+          },
+        },
+      },
+      500: {
+        description: "Server error",
+      },
+    },
+  },
+},
+
+"/users/users/contacts": {
+  get: {
+    summary: "Get all contacts and chat users",
+    tags: ["Users"],
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        in: "query",
+        name: "search",
+        required: false,
+        schema: {
+          type: "string",
+        },
+        description: "Search users by name or email",
+      },
+    ],
+    responses: {
+      200: {
+        description: "Contacts fetched successfully",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                users: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      _id: { type: "string" },
+                      name: { type: "string" },
+                      email: { type: "string" },
+                      isContact: { type: "boolean" },
+                      contactId: { type: "string", nullable: true },
+                      isBlocked: { type: "boolean" },
+                      profilePic: { type: "string", nullable: true },
+                      about: { type: "string" },
+                      lastSeen: { type: "string", nullable: true },
+                      status: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      404: {
+        description: "User not found",
+      },
+    },
+  },
+},
+
+
+
+"/users/contacts/{contactId}": {
+  delete: {
+    summary: "Remove a contact",
+    tags: ["Users"],
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        in: "path",
+        name: "contactId",
+        required: true,
+        schema: {
+          type: "string",
+        },
+        description: "User ID of the contact to remove",
+      },
+    ],
+    responses: {
+      200: {
+        description: "Contact removed successfully",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                message: {
+                  type: "string",
+                  example: "Contact removed successfully",
+                },
+              },
+            },
+          },
+        },
+      },
+      400: {
+        description: "Contact not found in user list",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: false },
+                message: {
+                  type: "string",
+                  example: "Contact not found",
+                },
+              },
+            },
+          },
+        },
+      },
+      404: {
+        description: "User not found",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: false },
+                message: {
+                  type: "string",
+                  example: "User not found",
+                },
+              },
+            },
+          },
+        },
+      },
+      500: {
+        description: "Server error",
+      },
+    },
+  },
+},
+
     // =========================
 // 🔐 LOGOUT
 // =========================
